@@ -159,6 +159,8 @@ class BimlinkClient {
     const fileName = path.basename(filePath);
     const handle = await open(filePath, 'r');
     let fileId = '';
+    let lastResult = null;
+    const uploadDate = String(Math.floor(Date.now() / 1000));
     let index = 1;
     try {
       for (let start = 0; start < fileSize; start += CHUNK_SIZE) {
@@ -175,7 +177,7 @@ class BimlinkClient {
           start: String(start),
           end: String(end),
           index: String(index),
-          date: String(Math.floor(Date.now() / 1000)),
+          date: uploadDate,
           extra: '',
         });
         const response = await this.request(`${this.baseUrl}${UPLOAD_PATH}&${query}`, {
@@ -183,7 +185,8 @@ class BimlinkClient {
           body: form,
         });
         const result = await this.readJson(response, 'upload');
-        if (result.code === 'error') fail('upload', result.msg || '上传分片失败', { index });
+        lastResult = result;
+        if (result.code === 'error') fail('upload', result.msg || '上传分片失败', { index, lastResult });
         if (result.id) fileId = String(result.id);
         console.error(JSON.stringify({ stage: 'upload', uploaded: end, total: fileSize }));
         index += 1;
@@ -191,7 +194,7 @@ class BimlinkClient {
     } finally {
       await handle.close();
     }
-    if (!fileId) fail('upload', '上传完成，但服务器没有返回文件 ID');
+    if (!fileId) fail('upload', '上传完成，但服务器没有返回文件 ID', { lastResult });
     return fileId;
   }
 
